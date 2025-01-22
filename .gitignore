@@ -1,0 +1,11 @@
+# Environment variable files
+.env
+
+# Encryption files
+*.key
+*.decrypted
+*.encrypted
+
+# Virtual environment
+venv/
+venv/*
