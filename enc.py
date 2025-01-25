@@ -26,7 +26,7 @@ environ.Env.read_env()
 class SecureFileEncryptor:
     """Handles file encryption and metadata signing with enhanced security"""
 
-    CHUNK_SIZE = 64 * 1024  # Reduced to 64KB for better memory management
+    CHUNK_SIZE = 64 * 1024 * 1024  # Reduced to 64MB for better memory management
     IV_SIZE = 12  # GCM recommended IV size
     SALT_SIZE = 32  # For key derivation
     MIN_KEY_SIZE = 2048  # Minimum RSA key size
@@ -289,7 +289,7 @@ if __name__ == "__main__":
     password = encryptor.encrypt_to_zip(
         input_file_path="test.txt",
         zip_path="encrypted_package.zip",
-        password=env("ENCRYPTION_PASSWORD"),
+        password=env("ENCRYPTION_PASSWORD", default=None),
     )
     print(f"Encryption completed. Zip password: {password}")
     print("Encryption and metadata signing completed.")
