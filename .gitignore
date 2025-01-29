@@ -9,3 +9,5 @@
 # Virtual environment
 venv/
 venv/*
+*.pem
+*.zip

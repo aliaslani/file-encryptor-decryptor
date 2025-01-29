@@ -14,13 +14,25 @@ from loguru import logger
 from typing import Dict, Optional
 import secrets
 from pathlib import Path
-import string
 from datetime import datetime
 import pyzipper
-import environ
+from secrets import token_urlsafe
+import ctypes
+from environ import Env
 
-env = environ.Env(DEBUG=(bool, False))
-environ.Env.read_env()
+
+env = Env()
+env.read_env()
+
+
+def secure_string_cleanup(s: str):
+    try:
+        # Get the memory address of the string
+        string_buffer = ctypes.create_string_buffer(s.encode())
+        # Overwrite with zeros
+        ctypes.memset(string_buffer, 0, len(string_buffer))
+    except Exception:
+        pass
 
 
 class SecureFileEncryptor:
@@ -238,44 +250,87 @@ class SecureFileEncryptorWithZip(SecureFileEncryptor):
         cleanup: bool = True,
     ) -> str:
         """Encrypt file and create AES password-protected zip with metadata."""
+        temp_dir = None
+        generated_password = None
+
         try:
-            temp_dir = Path(TemporaryDirectory(prefix="secure_zip_").name)
-            temp_dir.mkdir(parents=True)
+            # Use context manager for temporary directory
+            with TemporaryDirectory(prefix="secure_zip_") as temp_dir_str:
+                temp_dir = Path(temp_dir_str)
 
-            encrypted_file = temp_dir / "encrypted.bin"
-            metadata_file = temp_dir / "metadata.json"
+                # Set strict permissions on temporary directory
+                os.chmod(temp_dir, 0o777)  # Only owner can read/write/execute
 
-            # Use parent class encryption
-            self.encrypt_file(
-                input_file_path=input_file_path,
-                encrypted_file_path=str(encrypted_file),
-                metadata_file_path=str(metadata_file),
-            )
+                encrypted_file = temp_dir / "encrypted.bin"
+                metadata_file = temp_dir / "metadata.json"
 
-            # Generate random password if none provided
-            if not password:
-                chars = string.ascii_letters + string.digits + string.punctuation
-                password = "".join(secrets.choice(chars) for _ in range(32))
+                # Validate input file
+                if not os.path.exists(input_file_path):
+                    raise FileNotFoundError("Input file does not exist")
 
-            # Create AES-256 password-protected zip
-            with pyzipper.AESZipFile(
-                zip_path, "w", compression=pyzipper.ZIP_LZMA
-            ) as zf:
-                zf.setpassword(password.encode())
-                zf.setencryption(pyzipper.WZ_AES, nbits=256)
-                zf.write(encrypted_file, encrypted_file.name)
-                zf.write(metadata_file, metadata_file.name)
+                # Validate output path
+                zip_dir = os.path.dirname(zip_path)
+                if not os.access(zip_dir, os.W_OK):
+                    raise PermissionError("No write permission for output directory")
 
-            if cleanup:
-                shutil.rmtree(temp_dir)
+                # Use parent class encryption
+                self.encrypt_file(
+                    input_file_path=input_file_path,
+                    encrypted_file_path=str(encrypted_file),
+                    metadata_file_path=str(metadata_file),
+                )
 
-            return password
+                # Generate cryptographically secure password if none provided
+                if not password:
+                    generated_password = token_urlsafe(32)
+                    password = generated_password
+
+                # Validate password strength
+                if len(password) < 16:
+                    logger.debug(f"Password length: {len(password)}, {password}")
+                    raise ValueError("Password must be at least 16 characters long")
+
+                # Create AES-256 password-protected zip
+                with pyzipper.AESZipFile(
+                    zip_path, "w", compression=pyzipper.ZIP_LZMA
+                ) as zf:
+                    zf.setpassword(password.encode())
+                    zf.setencryption(pyzipper.WZ_AES, nbits=256)
+
+                    # Verify files exist before adding to zip
+                    if not encrypted_file.exists() or not metadata_file.exists():
+                        raise FileNotFoundError("Encrypted or metadata file missing")
+
+                    zf.write(encrypted_file, encrypted_file.name)
+                    zf.write(metadata_file, metadata_file.name)
+
+                # Verify zip file was created successfully
+                if not os.path.exists(zip_path):
+                    raise RuntimeError("Zip file was not created successfully")
+
+                # Set secure permissions on zip file
+                os.chmod(zip_path, 0o600)  # Only owner can read/write
+
+                return password
 
         except Exception as e:
-            logger.error(f"Zip creation failed: {str(e)}")
-            if temp_dir.exists():
-                shutil.rmtree(temp_dir)
+            logger.error(f"Zip creation failed: {str(e)}", exc_info=True)
+            # Clean up zip file if it exists
+            if os.path.exists(zip_path):
+                os.unlink(zip_path)
             raise ValueError(f"Failed to create encrypted zip: {str(e)}")
+
+        finally:
+            # Secure cleanup
+            if generated_password:
+                secure_string_cleanup(generated_password)
+            if cleanup and temp_dir and temp_dir.exists():
+                # Securely delete temporary files
+                for file in temp_dir.glob("*"):
+                    with open(file, "wb") as f:
+                        f.write(os.urandom(os.path.getsize(file)))
+                    os.unlink(file)
+                shutil.rmtree(temp_dir)
 
 
 # Example usage
@@ -286,10 +341,10 @@ if __name__ == "__main__":
         encrypted_file_path="encrypted.bin",
         metadata_file_path="metadata.json",
     )
-    password = encryptor.encrypt_to_zip(
+    result = encryptor.encrypt_to_zip(
         input_file_path="test.txt",
-        zip_path="encrypted_package.zip",
+        zip_path="./encrypted_package.zip",
         password=env("ENCRYPTION_PASSWORD", default=None),
     )
-    print(f"Encryption completed. Zip password: {password}")
+    print(f"Encryption completed. Zip password: {result}")
     print("Encryption and metadata signing completed.")
