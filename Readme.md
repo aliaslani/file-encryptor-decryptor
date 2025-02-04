@@ -1,90 +1,3 @@
-# Envelope File Encryption
-
-## Overview
-
-A robust Python implementation of envelope encryption for secure file protection, utilizing asymmetric and symmetric cryptographic techniques.
-
-## Features
-
-- **Secure Encryption**: Uses AES-256-GCM for file content
-- **Key Protection**: Encrypts symmetric AES key with RSA public key
-- **File Integrity**: Includes authentication via GCM tag
-- **Digital Signatures**: Signs encrypted files and metadata
-
-## Prerequisites
-
-- Python 3.8+
-- `cryptography` library
-- `loguru` library
-
-## Installation
-
-```bash
-pip install cryptography loguru
-```
-
-## Usage
-
-### Encryption
-
-```python
-from envelope_encryptor import EnvelopeFileEncryptor
-
-encryptor = EnvelopeFileEncryptor(
-    signing_private_key_path="private_key.pem",
-    encryption_public_key_path="public_key.pem"
-)
-
-encryptor.encrypt_file(
-    input_file_path="sensitive_document.txt",
-    encrypted_file_path="encrypted_document.enc",
-    metadata_file_path="document_metadata.json"
-)
-```
-
-## Security Mechanisms
-
-- Ephemeral AES key generation per file
-- RSA-OAEP key encryption
-- SHA256 for hashing and signatures
-- Minimum 2048-bit RSA key requirement
-
-## Key Generation (Example)
-
-Use OpenSSL to generate RSA keys:
-
-```bash
-# Generate private key
-openssl genrsa -out private_key.pem 2048
-
-# Extract public key
-openssl rsa -in private_key.pem -pubout -out public_key.pem
-```
-
-## Metadata Contents
-
-- Encrypted AES key
-- Initialization Vector (IV)
-- Authentication tag
-- Signature
-- Timestamp
-- Encryption algorithms used
-
-## Security Notes
-
-- Keep private keys confidential
-- Use strong, unique keys
-- Regularly rotate encryption keys
-
-## License
-
-[Specify your license here]
-
-## Contributing
-
-Contributions welcome. Please read contributing guidelines before submitting pull requests.
-
-
 راهنمای فارسی رمزنگار:
 ### توضیح گام به گام کد (به زبان ساده):
 
@@ -290,3 +203,76 @@ Contributions welcome. Please read contributing guidelines before submitting pul
 
 ### کاربرد در دنیای واقعی:
 این نوع رمزگشایی برای انتقال ایمن فایل‌های حساس (مانند اسناد مالی یا داده‌های پزشکی) در سیستم‌هایی که نیاز به حفظ محرمانگی، صحت و اعتبار داده‌ها دارند، استفاده می‌شود.
+
+
+# Secure File Encryptor with ZIP
+
+## Overview
+This script encrypts a file and stores it in a password-protected ZIP archive using AES-256 encryption. The encryption password is securely read from a `.env` file, ensuring automation and security.
+
+## Features
+- AES-256 encrypted ZIP file creation
+- Secure password retrieval from a `.env` file
+- Automatic cleanup of temporary files
+- Strong error handling and logging
+
+## Prerequisites
+Ensure you have the following installed:
+- Python 3.7+
+- Required Python packages:
+  ```sh
+  pip install pyzipper python-dotenv
+  ```
+
+## Installation
+1. Clone or download the script.
+2. Ensure the `.env` file is correctly set up (see below).
+
+## Usage
+### Step 1: Create a `.env` File
+Create a `.env` file in a secure location and add:
+```env
+ENCRYPTION_PASSWORD="yourstrongpassword1234"
+```
+Ensure the password is at least 16 characters long for security.
+
+### Step 2: Run the Script
+Use the following command to encrypt a file:
+```sh
+python script.py --input_file test.txt --env_file /path/to/.env
+```
+
+### Arguments:
+- `--input_file` : Path to the file you want to encrypt.
+- `--env_file` : Path to the `.env` file containing the encryption password.
+
+### Example
+```sh
+python enc.py --input_file test.txt --env_file ~/.env
+```
+
+## Output
+- Encrypted ZIP file: `test.txt.zip`
+- Password-protected with AES-256 encryption
+
+## Security Considerations
+- Keep your `.env` file in a secure location.
+- Do not share the password or ZIP file openly.
+- Ensure temporary files are securely deleted (handled by the script).
+
+## Troubleshooting
+### "Failed to create encrypted zip"
+Check the following:
+- Ensure the `.env` file exists and contains a valid password.
+- Verify write permissions for the output directory.
+- Ensure `pyzipper` and `django-environ` are installed.
+
+### "Password must be at least 16 characters long"
+- Update the `.env` file with a longer, stronger password.
+
+## License
+MIT License. Feel free to modify and improve!
+
+## Author
+Aslani / Fardaad
+
